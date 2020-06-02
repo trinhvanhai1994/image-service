@@ -1,12 +1,12 @@
 package com.ominext.image.view;
 
 import com.ominext.image.entity.Image;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.util.LinkedMultiValueMap;
@@ -23,22 +23,16 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 
-/**
- * A Swing application that uploads files to a HTTP server.
- *
- * @author www.codejava.net
- */
 public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListener {
     private JLabel labelURL = new JLabel("Upload URL: ");
     private JTextField fieldURL = new JTextField(30);
     private JButton buttonUpload = new JButton("Upload");
     private JButton buttonDownload = new JButton("Download");
-    private JLabel labelProgress = new JLabel("Progress:");
     private JProgressBar progressBar = new JProgressBar(0, 100);
-    private JFilePicker filePicker = new JFilePicker("Choose a file: ", "Browse");
+    private JFilePicker filePicker = new JFilePicker("Choose a file : ", "Browse");
+    private JFilePicker fileDownload = new JFilePicker("Choose a file : ", "Browse");
 
     private final static String ROOT_URL = "http://localhost:8888/images";
 
@@ -53,6 +47,7 @@ public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListene
 
         // set up components
         filePicker.setMode(JFilePicker.MODE_OPEN);
+        fileDownload.setMode(JFilePicker.MODE_OPEN);
 
         buttonUpload.addActionListener(new ActionListener() {
             @Override
@@ -64,7 +59,7 @@ public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListene
         buttonDownload.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
-                buttonUploadActionPerformed(event);
+                buttonDownloadActionPerformed(event);
             }
         });
 
@@ -86,50 +81,57 @@ public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListene
         constraints.weightx = 0.0;
         constraints.gridwidth = 2;
         constraints.fill = GridBagConstraints.NONE;
-        add(filePicker, constraints);
+        add(fileDownload, constraints);
 
         constraints.gridy = 2;
-        constraints.anchor = GridBagConstraints.LAST_LINE_START;
-        add(buttonUpload, constraints);
-
-        constraints.gridy = 2;
-        constraints.anchor = GridBagConstraints.LAST_LINE_END;
+        constraints.anchor = GridBagConstraints.CENTER;
         add(buttonDownload, constraints);
 
         constraints.gridx = 0;
-        constraints.gridy = 3;
-        constraints.gridwidth = 1;
-        constraints.anchor = GridBagConstraints.WEST;
-        add(labelProgress, constraints);
+        constraints.gridy = 4;
+        constraints.weightx = 0.0;
+        constraints.gridwidth = 2;
+        constraints.fill = GridBagConstraints.NONE;
+        add(filePicker, constraints);
 
-        constraints.gridx = 1;
-        constraints.weightx = 1.0;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        add(progressBar, constraints);
+        constraints.gridy = 5;
+        constraints.anchor = GridBagConstraints.CENTER;
+        add(buttonUpload, constraints);
 
         pack();
         setLocationRelativeTo(null);    // center on screen
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
-    /**
-     * handle click event of the Upload button
-     */
-    private void buttonUploadActionPerformed(ActionEvent event) {
-        String uploadURL = fieldURL.getText();
-        String filePath = filePicker.getSelectedFilePath();
-
-        if (!uploadURL.equals("")) {
-            getFile(uploadURL);
-            System.out.println(getFile(uploadURL));
-            return;
-        }
-        if (filePath.equals("")) {
-            JOptionPane.showMessageDialog(this, "Please choose a file to upload!", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
+    private void buttonDownloadActionPerformed(ActionEvent event) {
         try {
+            String uploadURL = fieldURL.getText();
+            String filePathDownload = fileDownload.getSelectedFilePath();
+
+            if (Strings.EMPTY.equals(filePathDownload)) {
+                JOptionPane.showMessageDialog(this, "Please choose a file to Download!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (Strings.EMPTY.equals(uploadURL)) {
+                JOptionPane.showMessageDialog(this, "Please download URL!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            getFile(uploadURL);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Error executing Download task: " + ex.getMessage(), "Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void buttonUploadActionPerformed(ActionEvent event) {
+        try {
+            String filePath = filePicker.getSelectedFilePath();
+            if (filePath.equals("")) {
+                JOptionPane.showMessageDialog(this, "Please choose a file to upload!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             File uploadFile = new File(filePath);
             byte[] fileContent = Files.readAllBytes(uploadFile.toPath());
             postFile("imageFile", fileContent);
@@ -167,7 +169,7 @@ public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListene
 
     private Image getFile(String urlImage) {
         RestTemplate restTemplate = new RestTemplate();
-        java.util.List<HttpMessageConverter<?>>  messageConverters = new ArrayList<>();
+        java.util.List<HttpMessageConverter<?>> messageConverters = new ArrayList<>();
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
         converter.setSupportedMediaTypes(Collections.singletonList(MediaType.ALL));
         messageConverters.add(converter);
@@ -176,9 +178,6 @@ public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListene
         return restTemplate.getForEntity(urlImage, Image.class).getBody();
     }
 
-    /**
-     * Update the progress bar's state whenever the progress of upload changes.
-     */
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
         if ("progress" == evt.getPropertyName()) {
@@ -187,9 +186,6 @@ public class SwingFileUploadHTTP extends JFrame implements PropertyChangeListene
         }
     }
 
-    /**
-     * Launch the application
-     */
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
